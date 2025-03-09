@@ -2,21 +2,23 @@ import RSAGGen
 import random
 from PublicParameters import PublicParameters
 from TC import TimedCommitment, TCOpening
+from PedersenCommitmentScheme import PedersenCommitmentPublicParams, pedersen_commit, pedersen_open
 import time
 
-def pedersen_commit(message: int) -> tuple[int, int]:
-    alpha = int(random.randint(1, PublicParameters.N - 1))
-    commitment = (pow(PublicParameters.g, message, PublicParameters.N) * pow(PublicParameters.h, alpha, PublicParameters.N)) % PublicParameters.N
-    return commitment, alpha
+# def pedersen_commit(message: int) -> tuple[int, int]:
+#     alpha = int(random.randint(1, PublicParameters.N - 1))
+#     commitment = (pow(PublicParameters.g, message, PublicParameters.N) * pow(PublicParameters.h, alpha, PublicParameters.N)) % PublicParameters.N
+#     return commitment, alpha
 
-def pedersen_open(commitment: int, message: int, opening: int) -> bool:
-    return commitment == (pow(PublicParameters.g, message, PublicParameters.N) * pow(PublicParameters.h, opening, PublicParameters.N)) % PublicParameters.N
+# def pedersen_open(commitment: int, message: int, opening: int) -> bool:
+#     return commitment == (pow(PublicParameters.g, message, PublicParameters.N) * pow(PublicParameters.h, opening, PublicParameters.N)) % PublicParameters.N
 
 def setup(lambda_, t):
     RSAG = RSAGGen.RSAG(lambda_, t)
     # euler's totient function - totient(N) = (q1-1)(q2-1) since we know that N = q1 * q2 where q1 and q2 are prime numbers
     z = pow(RSAG.h, pow(2, RSAG.t, (RSAG.q1 - 1) * (RSAG.q2 - 1)), RSAG.N)
     PublicParameters(lambda_, t, RSAG.h, RSAG.g, RSAG.N, z)
+    PedersenCommitmentPublicParams(lambda_)
 
 class TTDCommitment:
     def __init__(self, ped_commitment: int, timed_commitment_message: TimedCommitment, timed_commitment_ped_opening: TimedCommitment):
