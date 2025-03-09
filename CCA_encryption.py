@@ -37,11 +37,3 @@ class OneTimeKeyDeterministicAE:
         )[:len(data)]
 
         return bytes(d ^ p for d, p in zip(data, pad))  # XOR with keystream
-
-# key = hashlib.sha256(str(123).encode('utf-8')).digest()
-# print(key)
-# message = b"123"
-
-# ct = OneTimeKeyDeterministicAE.encrypt(key, bytes(message), b'300')
-# pt = OneTimeKeyDeterministicAE.decrypt(key, bytes(ct), b'300')
-# print(str(pt))

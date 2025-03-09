@@ -3,12 +3,11 @@ import hashlib
 import random
 from CCA_encryption import OneTimeKeyDeterministicAE
 from PublicParameters import PublicParameters
-import TTD
 import time
 
 class TCOpening:
     def __init__(self, opening_value, mode):
-        self.opening_value = opening_value
+        self.opening_value = opening_value # either alpha or Z based on opening mode (alpha for COMMITER and Z for FORCE)
         self.mode = mode # mode is either "COMMITER" or "FORCE"
 
 class TimedCommitment:
@@ -56,8 +55,6 @@ class TimedCommitment:
             t = PublicParameters.t
             t = t.to_bytes((t.bit_length() + 7) // 8 or 1)
             pt = OneTimeKeyDeterministicAE.decrypt(enc_key, tc.ct, t)
-            print(pt)
-            print(message)
             if pow(PublicParameters.h, alpha, PublicParameters.N) != tc.H:
                 # check that the obtained alpha is the one commited in H from the timed commitment
                 return False
@@ -68,13 +65,14 @@ class TimedCommitment:
             raise ValueError(f"Expected opening.mode either FORCE or COMMITER, but found {opening.mode}")
 
 if __name__ == "__main__":
-    lambda_ = 256
-    t = pow(2, 25)
-    RSAG, z = TTD.setup(lambda_, t)
-    PublicParameters(lambda_, t, RSAG.h, RSAG.g, RSAG.N, z)
-    message = bytes("Hello, Alin!".encode('utf-8'))
-    commitment, opening = TimedCommitment.commit(message)
-    print(TimedCommitment.verify_opening(message, commitment, opening))
+    print("Hi")
+    # lambda_ = 256
+    # t = pow(2, 25)
+    # RSAG, z = TTD.setup(lambda_, t)
+    # PublicParameters(lambda_, t, RSAG.h, RSAG.g, RSAG.N, z)
+    # message = bytes("Hello, Alin!".encode('utf-8'))
+    # commitment, opening = TimedCommitment.commit(message)
+    # print(TimedCommitment.verify_opening(message, commitment, opening))
 
     # alpha = opening.opening_value
     # H = pow(RSAG.h, alpha, RSAG.N)
@@ -89,11 +87,11 @@ if __name__ == "__main__":
     # t = t.to_bytes((t.bit_length() + 7) // 8 or 1)
     # pt = OneTimeKeyDeterministicAE.decrypt(enc_key, commitment.ct, t)
     # print(pt)
-    start_force = time.time()
-    print("Started force opening...")
-    forced_message, forced_opening = TimedCommitment.force_open(commitment)
-    print(f"Force opening time duration: {time.time() - start_force} seconds")
-    print(TimedCommitment.verify_opening(forced_message, commitment, forced_opening))
+    # start_force = time.time()
+    # print("Started force opening...")
+    # forced_message, forced_opening = TimedCommitment.force_open(commitment)
+    # print(f"Force opening time duration: {time.time() - start_force} seconds")
+    # print(TimedCommitment.verify_opening(forced_message, commitment, forced_opening))
     # print(str(forced_message))
     # print(pow(PublicParameters.z, opening.opening_value, PublicParameters.N))
     # print(forced_opening.opening_value)
