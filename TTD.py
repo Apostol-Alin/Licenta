@@ -59,14 +59,17 @@ def TTD_verify_opening(message: bytes, ped_opening: bytes, ttd_com: TTDCommitmen
 
 if __name__ == "__main__":
     lambda_ = 256
-    t = pow(2, 23)
+    t = pow(2, 25)
     message = 1999
     setup(lambda_, t)
 
+    start_force = time.time()
+    print("Started commiting message")
     com, open, ped_opening = TTD_commit(message)
     message_bytes = message.to_bytes((message.bit_length() + 7) // 8, byteorder='big')
     ped_opening_bytes = ped_opening.to_bytes((ped_opening.bit_length() + 7) // 8, byteorder='big')
     print(TTD_verify_opening(message_bytes, ped_opening_bytes, com, open))
+    print(f"commiting message time duration: {time.time() - start_force} seconds")
 
     start_force = time.time()
     print("Started force opening for the message...")
