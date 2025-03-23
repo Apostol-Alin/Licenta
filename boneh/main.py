@@ -74,7 +74,7 @@ class Commiter:
         # We don't know the order of g, but we know that it divides fi(N) // 4
         # So we can pick random values from Zfi(N) // 4
         if len(self.W) != self.t + 1:
-            raise ValueError(f"Expected W to have {self.t + 1} elements, but found {len(W)}")
+            raise ValueError(f"Expected W to have {self.t + 1} elements, but found {len(self.W)}")
         self.alphas = []
         self.pairs = []
         for i in range(self.t):
@@ -164,7 +164,10 @@ if __name__ == '__main__':
     subcontractor.compute_Ys([c for (c, _, _) in orange.Cs])
     # for (c, comm_c, open_c) in orange.Cs:
     #     print(f"{c} opens up: {pedersen_open(comm_c, c, open_c, orange.pp)}")
-    print(orange.check_validity(subcontractor.W, subcontractor.pairs, subcontractor.Ys, subcontractor.g))
+    if orange.check_validity(subcontractor.W, subcontractor.pairs, subcontractor.Ys, subcontractor.g):
+        print(orange.open(commitment, v))
+        print(orange.force_open(commitment))
+
     subcontractor2 = Commiter(lambda_, t)
     commitment2 = subcontractor2.commit(msg)
     a = pow(2, (2 ** t - len(msg)), (subcontractor2.p1 - 1) * (subcontractor2.p2 - 1))
@@ -172,6 +175,6 @@ if __name__ == '__main__':
     subcontractor2.compute_W()
     subcontractor2.compute_pairs()
     subcontractor2.compute_Ys([c for (c, _, _) in orange.Cs])
-    print(orange.check_validity(subcontractor2.W, subcontractor2.pairs, subcontractor2.Ys, subcontractor2.g))
-    print(orange.open(commitment, v))
-    print(orange.force_open(commitment))
+    if orange.check_validity(subcontractor2.W, subcontractor2.pairs, subcontractor2.Ys, subcontractor2.g):
+        print(orange.open(commitment2, v))
+        print(orange.force_open(commitment2))
