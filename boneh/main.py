@@ -43,18 +43,17 @@ class Commiter:
         a = pow(2, self.T, (self.p1 - 1) * (self.p2 - 1))
         return pow(self.g, a, self.N)
 
-    def compute_W(self) -> list[int]:
+    def compute_W(self):
         # The commiter must convince the verifier that u = (g ** 2) ** (2 ** t) mod N
         # To do so, the commiter sends a list W containing (g ** 2) ** (2 ** i) mod N for 0 <= i <= t
         # for 1 <= i <= t, the commiter proves that the tuple 
         # (g, W[i-1], W[i]) is a tuple of the form (g, g**x, g**(x**2)) for some x
         # The last element of W equals to u, thus the verifier is assured it was calculated properly
-        W = []
+        self.W = []
         for i in range(self.t + 1):
             a = pow(2, 2 ** i, (self.p1 - 1) * (self.p2 - 1))
             val = pow(self.g, a, self.N)
-            W.append(val)
-        return W
+            self.W.append(val)
     
     def commit(self, message: str):
         # here we expect the message to only contain 0s and 1s
@@ -69,6 +68,32 @@ class Commiter:
             S.append(str(rez ^ int(message[i - 1])))
         S = "".join(S)
         return Commitment(self.g, self.compute_u(), S)
+    
+    def compute_pairs(self):
+        # Pick t random values alpha_ from Zq where q is the order of g
+        # We don't know the order of g, but we know that it divides fi(N) // 4
+        # So we can pick random values from Zfi(N) // 4
+        if len(self.W) != self.t + 1:
+            raise ValueError(f"Expected W to have {self.t + 1} elements, but found {len(W)}")
+        self.alphas = []
+        self.pairs = []
+        for i in range(self.t):
+            alpha = random.randint(1, (self.p1 - 1) * (self.p2 - 1) // 4)
+            self.alphas.append(alpha)
+            z = pow(self.g, alpha, self.N)
+            w = pow(self.W[i], alpha, self.N)
+            self.pairs.append([z, w])
+        
+    def compute_Ys(self, Cs: list[int]):
+        if len(Cs) != self.t:
+            raise ValueError(f"Expected Cs to have {self.t} elements, but found {len(Cs)}")
+        self.Ys = []
+        for i in range(self.t):
+            alpha = self.alphas[i]
+            a = pow(2, 2 ** i)
+            Y = ((Cs[i] * a) % ((self.p1 - 1) * (self.p2 - 1) // 4) + alpha) % ((self.p1 - 1) * (self.p2 - 1) // 4)
+            self.Ys.append(Y)
+
     
 class Verifier:
     def __init__(self, N: int, t: int, R: int):
@@ -109,18 +134,44 @@ class Verifier:
             msg.append(str(val ^ (int(C.S[i - 1]))))
         print(f"Finished force opening for commitment in {time.time() - start} seconds")
         return "".join(msg)
+    
+    def check_validity(self, W: list[int], pairs: list[list[int]], Ys: list[int], g: int):
+        if len(pairs) != self.t or len(Ys) != self.t:
+            raise ValueError(f"Expected pairs and Ys to have {self.t} elements, but found {len(pairs)} and {len(Ys)}")
+        if len(W) != self.t + 1:
+            raise ValueError(f"Expected W to have {self.t + 1} elements, but found {len(W)}")
+        for i in range(1, self.t + 1):
+            z, w = pairs[i - 1]
+            y = Ys[i - 1]
+            check1 = pow(g, y, self.N) * pow(W[i - 1], -self.Cs[i - 1][0], self.N) % self.N
+            check2 = pow(W[i - 1], y, self.N) * pow(W[i], -self.Cs[i - 1][0], self.N) % self.N
+            if check1 != z or check2 != w:
+                return False
+        return True
 
 if __name__ == '__main__':
-    lambda_ = 64
-    t = 24
+    lambda_ = 128
+    t = 22
     msg = "01010111"
     subcontractor = Commiter(lambda_, t)
     commitment = subcontractor.commit(msg)
     a = pow(2, (2 ** t - len(msg)), (subcontractor.p1 - 1) * (subcontractor.p2 - 1))
     v = pow(subcontractor.g, a, subcontractor.N)
+    subcontractor.compute_W()
     orange = Verifier(subcontractor.N, t, 128)
     orange.commit_to_cs()
+    subcontractor.compute_pairs()
+    subcontractor.compute_Ys([c for (c, _, _) in orange.Cs])
     # for (c, comm_c, open_c) in orange.Cs:
     #     print(f"{c} opens up: {pedersen_open(comm_c, c, open_c, orange.pp)}")
+    print(orange.check_validity(subcontractor.W, subcontractor.pairs, subcontractor.Ys, subcontractor.g))
+    subcontractor2 = Commiter(lambda_, t)
+    commitment2 = subcontractor2.commit(msg)
+    a = pow(2, (2 ** t - len(msg)), (subcontractor2.p1 - 1) * (subcontractor2.p2 - 1))
+    v = pow(subcontractor2.g, a, subcontractor2.N)
+    subcontractor2.compute_W()
+    subcontractor2.compute_pairs()
+    subcontractor2.compute_Ys([c for (c, _, _) in orange.Cs])
+    print(orange.check_validity(subcontractor2.W, subcontractor2.pairs, subcontractor2.Ys, subcontractor2.g))
     print(orange.open(commitment, v))
     print(orange.force_open(commitment))
