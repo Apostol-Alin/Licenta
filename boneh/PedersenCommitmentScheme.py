@@ -1,21 +1,20 @@
 import random
-from sympy.ntheory import isprime
 import ecdsa
 
 class PedersenCommitmentPublicParams:
     def __init__(self):
         curve = ecdsa.SECP256k1
-        PedersenCommitmentPublicParams.g = curve.generator
-        PedersenCommitmentPublicParams.N = curve.order
-        PedersenCommitmentPublicParams.h = random.randint(2, self.N - 1) * self.g # we do not know log(h) in regard to g
+        self.g = curve.generator
+        self.N = curve.order
+        self.h = random.randint(2, self.N - 1) * self.g # we do not know log(h) in regard to g
 
-def pedersen_commit(message: int) -> tuple[int, int]:
-    alpha = int(random.randint(1, PedersenCommitmentPublicParams.N - 1))
-    commitment = (message * PedersenCommitmentPublicParams.g)  +\
-            (alpha * PedersenCommitmentPublicParams.h) 
+def pedersen_commit(message: int, pp: PedersenCommitmentPublicParams) -> tuple[int, int]:
+    alpha = int(random.randint(1, pp.N - 1))
+    commitment = (message * pp.g)  +\
+            (alpha * pp.h) 
     return commitment, alpha
 
-def pedersen_open(commitment: int, message: int, opening: int) -> bool:
+def pedersen_open(commitment: int, message: int, opening: int, pp: PedersenCommitmentPublicParams) -> bool:
     return commitment == \
-            message * PedersenCommitmentPublicParams.g +\
-            opening * PedersenCommitmentPublicParams.h
+            message * pp.g +\
+            opening * pp.h
