@@ -14,7 +14,7 @@ def generate_safe_prime(lambda_: int) -> int:
     print("Generating safe prime...")
     # We define a safe prime a prime number `q` for which (q - 1) // 2 is also prime
     q = sympy.randprime(2 ** lambda_, 2 ** (lambda_ + 1))
-    while not isprime((q - 1) // 2):
+    while not sympy.ntheory.isprime((q - 1) // 2):
         q = sympy.randprime(2 ** lambda_, 2 ** (lambda_ + 1))
     return q
 
