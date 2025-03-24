@@ -1,0 +1,31 @@
+services:
+  server:
+    build: ./server/
+    image: server
+    ports:
+      - "5000:5000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/app-tester"]
+      interval: 10s
+      timeout: 30s
+      retries: 5
+      start_period: 5s
+  
+  client1:
+    build: ./client/
+    image: client
+    environment:
+      - CLIENT_ID=client1
+    depends_on:
+      server:
+        condition: service_healthy
+
+
+  client2:
+    build: ./client/
+    image: client
+    environment:
+      - CLIENT_ID=client2
+    depends_on:
+      server:
+        condition: service_healthy
