@@ -20,7 +20,6 @@ services:
       server:
         condition: service_healthy
 
-
   client2:
     build: ./client/
     image: client
