@@ -1,6 +1,5 @@
 import requests
-import time
-import json
+from TC import *
 import os
 
 SERVER_URL = "http://server:5000"
@@ -23,7 +22,7 @@ def send_pp(N: int, t: int):
     response = requests.post(f"{SERVER_URL}/send-public-parameters", json=data)
     print(f"Client {CLIENT_ID} set public parameters, response: {response.json()}")
 
-def send_commitment(commitment: str, W: list[int]):
+def send_commitment(commitment: dict, W: list[int]):
     data = {
         "client_id": CLIENT_ID,
         "commitment": commitment,
@@ -41,11 +40,27 @@ def get_Cs():
     else:
         print(f"Failed to get Cs: {response.json()}")
         return None
+    
+def send_pairs(pairs: list[list[int]]):
+    data = {
+        "client_id": CLIENT_ID,
+        "pairs": client.pairs
+    }
+    response = requests.post(f"{SERVER_URL}/send-pairs", json=data)
+    print(f"Client {CLIENT_ID} sent pairs, response: {response.json()}")
 
 if __name__ == "__main__":
-    send_pp(12345, 5)
-    W = [1, 2, 3, 4, 5, 6]
-    commitment = "1011101110"
-    send_commitment(commitment, W)
+    lambda_ = 128
+    t = 22
+    client = Commiter(128, 22)
+    send_pp(client.N, client.t)
+    message = "110011" # 27
+    commitment = client.commit(message)
+    g, u, S = commitment.g, commitment.u, commitment.S
+    commitment_dict = {'g': g, 'u': u, 'S': S}
+    client.compute_W()
+    send_commitment(commitment_dict, client.W)
     Cs = get_Cs()
+    client.compute_pairs()
+    send_pairs(client.pairs)
 
