@@ -16,6 +16,7 @@ services:
     image: client
     environment:
       - CLIENT_ID=client1
+      - MESSAGE=0110111101
     depends_on:
       server:
         condition: service_healthy
@@ -25,6 +26,7 @@ services:
     image: client
     environment:
       - CLIENT_ID=client2
+      - MESSAGE=0111010001
     depends_on:
       server:
         condition: service_healthy

@@ -7,8 +7,9 @@ class protocol_states(Enum):
     CW_PROVIDED = 2
     CS_SENT = 3
     PAIRS_PROVIDED = 4
-
-
+    OPENINGS_SENT = 5
+    ACCEPTED = 6
+    REJECTED = 7
 
 app = Flask(__name__)
 
@@ -25,7 +26,6 @@ client_data = {
     # }
 }
 
-# First step of the protocol
 @app.route('/send-public-parameters', methods=['POST'])
 def send_public_parameters():
     """
@@ -105,7 +105,17 @@ def get_Cs(client_id):
 
         verifier = client_data[client_id]["verifier"]
         verifier.commit_to_cs()
-        Cs = [c[1] for c in verifier.Cs] # Cs is a list of tuples (c, commitment, opening)
+        Cs = []
+        for c in verifier.Cs:
+            commitment_Jacobi = c[1]
+            commitment_affine = commitment_Jacobi.to_affine()
+            commitment_affine_x = commitment_affine.x()
+            commitment_affine_y = commitment_affine.y()
+            commitment = {
+                "x": commitment_affine_x,
+                "y": commitment_affine_y
+            }
+            Cs.append(commitment)
         dict = {"Cs": Cs}
         client_data[client_id]["state"] = protocol_states.CS_SENT
 
@@ -148,19 +158,96 @@ def get_openings(client_id):
         if client_id not in client_data.keys():
             raise ValueError("Client ID not found.")
         if client_data[client_id]["state"] != protocol_states.PAIRS_PROVIDED:
-            raise ValueError("Commitment and W must be provided first.")
+            raise ValueError("Pairs <zi, wi> must be provided first.")
 
         verifier = client_data[client_id]["verifier"]
         openings = []
         for c in verifier.Cs:
-            commitment = c[0]
+            value = c[0]
             opening = c[2]
-            openings.append(opening)
-        dict = {"openings": openings, "g": verifier.pp.g, "N": verifier.pp.N}
-        print(f"Commitment: {commitment}, Opening: {opening}")
-        client_data[client_id]["state"] = protocol_states.CS_SENT
+            # to open a Pedersen commitment, we need to send the value and the opening
+            openings.append([value, opening])
+        g_affine = verifier.pp.g.to_affine()
+        h_affine = verifier.pp.h.to_affine()
+        g_x = g_affine.x()
+        g_y = g_affine.y()
+        h_x = h_affine.x()
+        h_y = h_affine.y()
+        g = {
+            "x": g_x,
+            "y": g_y
+        }
+        h = {
+            "x": h_x,
+            "y": h_y
+        }
+        dict = {"openings": openings, "g": g, "h": h, "N": verifier.pp.N}
+        client_data[client_id]["state"] = protocol_states.OPENINGS_SENT
 
         return jsonify(dict), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+    
+@app.route('/delete-client/<client_id>', methods=['DELETE'])
+def delete_client(client_id):
+    """
+    The server deletes the client data.
+    """
+    try:
+        if client_id not in client_data.keys():
+            raise ValueError("Client ID not found.")
+        client_data.pop(client_id)
+        return jsonify({"message": "Client data deleted", "client_id": client_id}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route('/send-Ys', methods=['POST'])
+def send_Ys():
+    """
+    The client sends the Ys to the server. yi = ci * 2 ** (2 ** (i-1)) + alphai
+    """
+    try:
+        req_json = request.get_json()
+        client_id = req_json.get("client_id")
+        Ys = req_json.get("Ys")
+        if client_id not in client_data.keys():
+            raise ValueError("Client ID not found.")
+        if client_data[client_id]["state"] != protocol_states.OPENINGS_SENT:
+            raise ValueError("Openings must be requested first.")
+        else:
+            if type(Ys) != list:
+                raise ValueError("Ys must be a list.")
+            if len(Ys) != client_data[client_id]["t"]:
+                raise ValueError("Ys must be of length t.")
+        client_data[client_id]["Ys"] = Ys
+        verifier = client_data[client_id]["verifier"]
+        if verifier.check_validity(client_data[client_id]["W"], client_data[client_id]["pairs"], Ys, client_data[client_id]["commitment"]["g"]):
+            client_data[client_id]["state"] = protocol_states.ACCEPTED
+            return jsonify({"message": "Ys received; accepted to auction", "client_id": client_id}), 200
+        else:
+            client_data[client_id]["state"] = protocol_states.REJECTED
+            return jsonify({"message": "Ys received; not accepted to auction", "client_id": client_id}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+    
+@app.route('/open', methods=['POST'])
+def open():
+    """
+    The client opens the timmed commitment, providing v to the server.
+    """
+    try:
+        req_json = request.get_json()
+        client_id = req_json.get("client_id")
+        v = req_json.get("v")
+        if client_id not in client_data.keys():
+            raise ValueError("Client ID not found.")
+        if client_data[client_id]["state"] != protocol_states.ACCEPTED:
+            raise ValueError("Openings must be requested first.")
+        verifier = client_data[client_id]["verifier"]
+        commitment = Commitment(client_data[client_id]["commitment"]["g"], client_data[client_id]["commitment"]["u"], client_data[client_id]["commitment"]["S"])
+        message = verifier.open(commitment, v)
+        client_data[client_id]["message"] = message
+        return jsonify({"message": "Commitment opened to " + message, "client_id": client_id}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
