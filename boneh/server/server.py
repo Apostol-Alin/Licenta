@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from enum import Enum
 from TC import *
+import threading
 
 class protocol_states(Enum):
     PP_PROVIDED = 1
@@ -242,7 +243,7 @@ def open():
         if client_id not in client_data.keys():
             raise ValueError("Client ID not found.")
         if client_data[client_id]["state"] != protocol_states.ACCEPTED:
-            raise ValueError("Openings must be requested first.")
+            raise ValueError("Client must be first accepted to the auction in order to open his commitment.")
         verifier = client_data[client_id]["verifier"]
         commitment = Commitment(client_data[client_id]["commitment"]["g"], client_data[client_id]["commitment"]["u"], client_data[client_id]["commitment"]["S"])
         message = verifier.open(commitment, v)
@@ -251,6 +252,25 @@ def open():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
+def server_force_open(verifier: Verifier, client_id: str, commitment: Commitment):
+    message = verifier.force_open(commitment)
+    client_data[client_id]["force_opened_message"] = message
+    
+@app.route('/force-open/<client_id>', methods=['GET'])
+def force_open(client_id):
+    try:
+        if client_id not in client_data.keys():
+            raise ValueError("Client ID not found.")
+        if client_data[client_id]["state"] != protocol_states.ACCEPTED:
+            raise ValueError("A client must be accepted to the auction in order to force open the commitment")
+        verifier = client_data[client_id]["verifier"]
+        commitment = Commitment(client_data[client_id]["commitment"]["g"], client_data[client_id]["commitment"]["u"], client_data[client_id]["commitment"]["S"])
+        thread = threading.Thread(target=server_force_open, args=(verifier, client_id, commitment))
+        thread.daemon = True
+        thread.start()
+        return jsonify({"message": "Force open of the commitment started", "client_id": client_id}), 202
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 @app.route('/app-tester', methods=['GET'])
 def app_tester():
@@ -268,9 +288,11 @@ def get_client_data(client_id):
         "commitment": data["commitment"],
         "W": data["W"],
         "pairs": data.get("pairs"),
-        "Ys": data.get("Ys")
+        "Ys": data.get("Ys"),
+        "message": data.get("message", None),
+        "force_opened_message": data.get("force_opened_message", None)
     }
-    return jsonify(new_data), 200
+    return jsonify(new_data), 202
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, threaded=True)

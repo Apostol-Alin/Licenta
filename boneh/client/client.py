@@ -125,8 +125,8 @@ def open(v: int):
 
 if __name__ == "__main__":
     lambda_ = 128
-    t = 22
-    client = Commiter(128, 22)
+    t = 26
+    client = Commiter(lambda_, t)
     send_pp(client.N, client.t)
     commitment = client.commit(message)
     g, u, S = commitment.g, commitment.u, commitment.S
@@ -147,7 +147,7 @@ if __name__ == "__main__":
         send_Ys(client.Ys)
         a = pow(2, (2 ** t - len(message)), (client.p1 - 1) * (client.p2 - 1))
         v = pow(client.g, a, client.N)
-        sleep(15)
+        # sleep(15)
         open(v)
     except Exception as e:
         quit_auction()
