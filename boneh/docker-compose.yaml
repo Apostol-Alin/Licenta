@@ -1,9 +1,17 @@
 services:
+
+  redis:
+    image: redis:latest
+    restart: always
+    ports:
+      - "6379:6379"
   server:
     build: ./server/
     image: server
     ports:
       - "5000:5000"
+    depends_on:
+      - redis
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/app-tester"]
       interval: 10s

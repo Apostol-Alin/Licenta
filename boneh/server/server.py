@@ -1,7 +1,8 @@
 from flask import Flask, request, jsonify
 from enum import Enum
 from TC import *
-import threading
+import redis
+import pickle
 
 class protocol_states(Enum):
     PP_PROVIDED = 1
@@ -14,18 +15,33 @@ class protocol_states(Enum):
 
 app = Flask(__name__)
 
-client_data = {
-    # "client_id": {
-        # "N": ,
-        # "t": ,
-        # "state": ,
-        # "commitment": ,
-        # "W": ,
-        # "pairs": ,
-        # "Ys": 
-        # "verifier"
-    # }
-}
+# client_data = {
+#     # "client_id": {
+#         # "N": ,
+#         # "t": ,
+#         # "state": ,
+#         # "commitment": ,
+#         # "W": ,
+#         # "pairs": ,
+#         # "Ys": 
+#         # "verifier"
+#     # }
+# }
+
+redis_client = redis.Redis(host='redis', port=6379, db=0)
+
+def save_client_data(client_id, data):
+    """
+    Save client data to Redis."""
+    redis_client.set(client_id, pickle.dumps(data))
+
+def get_client_data(client_id):
+    """
+    Get client data from Redis."""
+    data = redis_client.get(client_id)
+    if data:
+        return pickle.loads(data)
+    return None
 
 @app.route('/send-public-parameters', methods=['POST'])
 def send_public_parameters():
@@ -40,8 +56,7 @@ def send_public_parameters():
             raise ValueError("Client ID must be provided.")
         if not N or not t:
             raise ValueError("Both N and t must be provided.")
-
-        client_data[client_id] = {
+        client_data = {
             "N": N,
             "t": t,
             "state": protocol_states.PP_PROVIDED,
@@ -51,6 +66,7 @@ def send_public_parameters():
             "Ys": None,
             "verifier": Verifier(N, t, 128) # make R=128 default value
         }
+        save_client_data(client_id, client_data)
         return jsonify({"message": "Public parameters received", "client_id": client_id}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -66,9 +82,10 @@ def send_commitment():
         W = req_json.get("W")
         if not client_id:
             raise ValueError("Client ID must be provided.")
-        if client_id not in client_data.keys():
+        client_data = get_client_data(client_id)
+        if client_data is None:
             raise ValueError("Client ID not found.")
-        if client_data[client_id]["state"] != protocol_states.PP_PROVIDED:
+        if client_data["state"] != protocol_states.PP_PROVIDED:
             raise ValueError("Public parameters must be provided first.")
         if not commitment:
             raise ValueError("Commitment must be provided.")
@@ -81,14 +98,15 @@ def send_commitment():
         else:
             if type(W) != list:
                 raise ValueError("W must be a list.")
-            if len(W) != client_data[client_id]["t"] + 1:
+            if len(W) != client_data["t"] + 1:
                 raise ValueError("W must be of length t + 1.")
 
-        client_data[client_id]["commitment"]["g"] = int(commitment["g"])
-        client_data[client_id]["commitment"]["u"] = int(commitment["u"])
-        client_data[client_id]["commitment"]["S"] = commitment["S"]
-        client_data[client_id]["W"] = W
-        client_data[client_id]["state"] = protocol_states.CW_PROVIDED
+        client_data["commitment"]["g"] = int(commitment["g"])
+        client_data["commitment"]["u"] = int(commitment["u"])
+        client_data["commitment"]["S"] = commitment["S"]
+        client_data["W"] = W
+        client_data["state"] = protocol_states.CW_PROVIDED
+        save_client_data(client_id, client_data)
         return jsonify({"message": "Commitment received", "client_id": client_id}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -99,12 +117,13 @@ def get_Cs(client_id):
     The server sends a list of commited values c to the client.
     These are used for commitment verification."""
     try:
-        if client_id not in client_data.keys():
+        client_data = get_client_data(client_id)
+        if client_data is None:
             raise ValueError("Client ID not found.")
-        if client_data[client_id]["state"] != protocol_states.CW_PROVIDED:
+        if client_data["state"] != protocol_states.CW_PROVIDED:
             raise ValueError("Commitment and W must be provided first.")
 
-        verifier = client_data[client_id]["verifier"]
+        verifier = client_data["verifier"]
         verifier.commit_to_cs()
         Cs = []
         for c in verifier.Cs:
@@ -118,8 +137,8 @@ def get_Cs(client_id):
             }
             Cs.append(commitment)
         dict = {"Cs": Cs}
-        client_data[client_id]["state"] = protocol_states.CS_SENT
-
+        client_data["state"] = protocol_states.CS_SENT
+        save_client_data(client_id, client_data)
         return jsonify(dict), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -132,9 +151,10 @@ def send_pairs():
     try:
         req_json = request.get_json()
         client_id = req_json.get("client_id")
-        if client_id not in client_data.keys():
+        client_data = get_client_data(client_id)
+        if client_data is None:
             raise ValueError("Client ID not found.")
-        if client_data[client_id]["state"] != protocol_states.CS_SENT:
+        if client_data["state"] != protocol_states.CS_SENT:
             raise ValueError("Cs must be requested before sending (z, w) pairs.")
         pairs = req_json.get("pairs")
         if not pairs:
@@ -142,10 +162,11 @@ def send_pairs():
         else:
             if type(pairs) != list:
                 raise ValueError("Pairs must be a list.")
-            if len(pairs) != client_data[client_id]["t"]:
+            if len(pairs) != client_data["t"]:
                 raise ValueError("Pairs must be of length t.")
-        client_data[client_id]["pairs"] = pairs
-        client_data[client_id]["state"] = protocol_states.PAIRS_PROVIDED
+        client_data["pairs"] = pairs
+        client_data["state"] = protocol_states.PAIRS_PROVIDED
+        save_client_data(client_id, client_data)
         return jsonify({"message": "Pairs received", "client_id": client_id}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -156,12 +177,13 @@ def get_openings(client_id):
     The server sends the openings of the commitments of Cs to the client.
     """
     try:
-        if client_id not in client_data.keys():
+        client_data = get_client_data(client_id)
+        if client_data is None:
             raise ValueError("Client ID not found.")
-        if client_data[client_id]["state"] != protocol_states.PAIRS_PROVIDED:
+        if client_data["state"] != protocol_states.PAIRS_PROVIDED:
             raise ValueError("Pairs <zi, wi> must be provided first.")
 
-        verifier = client_data[client_id]["verifier"]
+        verifier = client_data["verifier"]
         openings = []
         for c in verifier.Cs:
             value = c[0]
@@ -183,8 +205,8 @@ def get_openings(client_id):
             "y": h_y
         }
         dict = {"openings": openings, "g": g, "h": h, "N": verifier.pp.N}
-        client_data[client_id]["state"] = protocol_states.OPENINGS_SENT
-
+        client_data["state"] = protocol_states.OPENINGS_SENT
+        save_client_data(client_id, client_data)
         return jsonify(dict), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -195,9 +217,7 @@ def delete_client(client_id):
     The server deletes the client data.
     """
     try:
-        if client_id not in client_data.keys():
-            raise ValueError("Client ID not found.")
-        client_data.pop(client_id)
+        redis_client.delete(client_id)
         return jsonify({"message": "Client data deleted", "client_id": client_id}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -211,22 +231,25 @@ def send_Ys():
         req_json = request.get_json()
         client_id = req_json.get("client_id")
         Ys = req_json.get("Ys")
-        if client_id not in client_data.keys():
+        client_data = get_client_data(client_id)
+        if client_data is None:
             raise ValueError("Client ID not found.")
-        if client_data[client_id]["state"] != protocol_states.OPENINGS_SENT:
+        if client_data["state"] != protocol_states.OPENINGS_SENT:
             raise ValueError("Openings must be requested first.")
         else:
             if type(Ys) != list:
                 raise ValueError("Ys must be a list.")
-            if len(Ys) != client_data[client_id]["t"]:
+            if len(Ys) != client_data["t"]:
                 raise ValueError("Ys must be of length t.")
-        client_data[client_id]["Ys"] = Ys
-        verifier = client_data[client_id]["verifier"]
-        if verifier.check_validity(client_data[client_id]["W"], client_data[client_id]["pairs"], Ys, client_data[client_id]["commitment"]["g"]):
-            client_data[client_id]["state"] = protocol_states.ACCEPTED
+        client_data["Ys"] = Ys
+        verifier = client_data["verifier"]
+        if verifier.check_validity(client_data["W"], client_data["pairs"], Ys, client_data["commitment"]["g"]):
+            client_data["state"] = protocol_states.ACCEPTED
+            save_client_data(client_id, client_data)
             return jsonify({"message": "Ys received; accepted to auction", "client_id": client_id}), 200
         else:
-            client_data[client_id]["state"] = protocol_states.REJECTED
+            client_data["state"] = protocol_states.REJECTED
+            save_client_data(client_id, client_data)
             return jsonify({"message": "Ys received; not accepted to auction", "client_id": client_id}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -240,34 +263,33 @@ def open():
         req_json = request.get_json()
         client_id = req_json.get("client_id")
         v = req_json.get("v")
-        if client_id not in client_data.keys():
+        client_data = get_client_data(client_id)
+        if client_data is None:
             raise ValueError("Client ID not found.")
-        if client_data[client_id]["state"] != protocol_states.ACCEPTED:
+        if client_data["state"] != protocol_states.ACCEPTED:
             raise ValueError("Client must be first accepted to the auction in order to open his commitment.")
-        verifier = client_data[client_id]["verifier"]
-        commitment = Commitment(client_data[client_id]["commitment"]["g"], client_data[client_id]["commitment"]["u"], client_data[client_id]["commitment"]["S"])
+        verifier = client_data["verifier"]
+        commitment = Commitment(client_data["commitment"]["g"], client_data["commitment"]["u"], client_data["commitment"]["S"])
         message = verifier.open(commitment, v)
-        client_data[client_id]["message"] = message
+        client_data["message"] = message
+        save_client_data(client_id, client_data)
         return jsonify({"message": "Commitment opened to " + message, "client_id": client_id}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
-
-def server_force_open(verifier: Verifier, client_id: str, commitment: Commitment):
-    message = verifier.force_open(commitment)
-    client_data[client_id]["force_opened_message"] = message
     
 @app.route('/force-open/<client_id>', methods=['GET'])
 def force_open(client_id):
     try:
-        if client_id not in client_data.keys():
+        client_data = get_client_data(client_id)
+        if client_data is None:
             raise ValueError("Client ID not found.")
-        if client_data[client_id]["state"] != protocol_states.ACCEPTED:
+        if client_data["state"] != protocol_states.ACCEPTED:
             raise ValueError("A client must be accepted to the auction in order to force open the commitment")
-        verifier = client_data[client_id]["verifier"]
-        commitment = Commitment(client_data[client_id]["commitment"]["g"], client_data[client_id]["commitment"]["u"], client_data[client_id]["commitment"]["S"])
-        thread = threading.Thread(target=server_force_open, args=(verifier, client_id, commitment))
-        thread.daemon = True
-        thread.start()
+        verifier = client_data["verifier"]
+        commitment = Commitment(client_data["commitment"]["g"], client_data["commitment"]["u"], client_data["commitment"]["S"])
+        force_opened_message = verifier.force_open(commitment)
+        client_data["force_opened_message"] = force_opened_message
+        save_client_data(client_id, client_data)
         return jsonify({"message": "Force open of the commitment started", "client_id": client_id}), 202
     except Exception as e:
         return jsonify({"error": str(e)}), 400
@@ -277,20 +299,20 @@ def app_tester():
     return jsonify({"message": "App ok"}), 200
 
 @app.route('/get/<client_id>', methods=['GET'])
-def get_client_data(client_id):
-    if client_id not in client_data.keys():
+def get_client(client_id):
+    client_data = get_client_data(client_id)
+    if client_data is None:
         return jsonify({"error": "Client ID not found"}), 404
-    data = client_data.get(client_id)
     new_data = {    
-        "N": data["N"],
-        "t": data["t"],
-        "state": data["state"].name,
-        "commitment": data["commitment"],
-        "W": data["W"],
-        "pairs": data.get("pairs"),
-        "Ys": data.get("Ys"),
-        "message": data.get("message", None),
-        "force_opened_message": data.get("force_opened_message", None)
+        "N": client_data["N"],
+        "t": client_data["t"],
+        "state": client_data["state"].name,
+        "commitment": client_data["commitment"],
+        "W": client_data["W"],
+        "pairs": client_data.get("pairs"),
+        "Ys": client_data.get("Ys"),
+        "message": client_data.get("message", None),
+        "force_opened_message": client_data.get("force_opened_message", None)
     }
     return jsonify(new_data), 202
 
