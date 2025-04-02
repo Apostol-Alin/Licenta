@@ -125,7 +125,7 @@ def open(v: int):
 
 if __name__ == "__main__":
     lambda_ = 128
-    t = 26
+    t = 27
     client = Commiter(lambda_, t)
     send_pp(client.N, client.t)
     commitment = client.commit(message)

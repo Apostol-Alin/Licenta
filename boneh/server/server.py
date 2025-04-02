@@ -1,5 +1,6 @@
-from flask import Flask, request, jsonify
+from flask import Flask, render_template, request, jsonify
 from enum import Enum
+import time
 from TC import *
 import redis
 import pickle
@@ -14,6 +15,9 @@ class protocol_states(Enum):
     REJECTED = 7
 
 app = Flask(__name__)
+
+auction_start_time = time.time()
+auction_duration = 30 # 30 seconds
 
 # client_data = {
 #     # "client_id": {
@@ -45,6 +49,8 @@ def get_client_data(client_id):
 
 @app.route('/send-public-parameters', methods=['POST'])
 def send_public_parameters():
+    if time.time() - auction_start_time > auction_duration:
+        return jsonify({"error": "Auction has ended"}), 400
     """
     The client sends public parameters (N and t) to the server."""
     try:
@@ -73,6 +79,8 @@ def send_public_parameters():
     
 @app.route('/send-commitment', methods=['POST'])
 def send_commitment():
+    if time.time() - auction_start_time > auction_duration:
+        return jsonify({"error": "Auction has ended"}), 400
     """
     The client sends a commitment to the server."""
     try:
@@ -113,6 +121,8 @@ def send_commitment():
     
 @app.route('/get-Cs/<client_id>', methods=['GET'])
 def get_Cs(client_id):
+    if time.time() - auction_start_time > auction_duration:
+        return jsonify({"error": "Auction has ended"}), 400
     """
     The server sends a list of commited values c to the client.
     These are used for commitment verification."""
@@ -145,6 +155,8 @@ def get_Cs(client_id):
     
 @app.route('/send-pairs', methods=['POST'])
 def send_pairs():
+    if time.time() - auction_start_time > auction_duration:
+        return jsonify({"error": "Auction has ended"}), 400
     """
     The client sends t pairs (z, w) to the server.
     """
@@ -173,6 +185,8 @@ def send_pairs():
     
 @app.route('/get-openings/<client_id>', methods=['GET'])
 def get_openings(client_id):
+    if time.time() - auction_start_time > auction_duration:
+        return jsonify({"error": "Auction has ended"}), 400
     """
     The server sends the openings of the commitments of Cs to the client.
     """
@@ -213,6 +227,8 @@ def get_openings(client_id):
     
 @app.route('/delete-client/<client_id>', methods=['DELETE'])
 def delete_client(client_id):
+    if time.time() - auction_start_time > auction_duration:
+        return jsonify({"error": "Auction has ended"}), 400
     """
     The server deletes the client data.
     """
@@ -224,6 +240,8 @@ def delete_client(client_id):
 
 @app.route('/send-Ys', methods=['POST'])
 def send_Ys():
+    if time.time() - auction_start_time > auction_duration:
+        return jsonify({"error": "Auction has ended"}), 400
     """
     The client sends the Ys to the server. yi = ci * 2 ** (2 ** (i-1)) + alphai
     """
@@ -297,6 +315,26 @@ def force_open(client_id):
 @app.route('/app-tester', methods=['GET'])
 def app_tester():
     return jsonify({"message": "App ok"}), 200
+
+@app.route('/', methods=['GET'])
+@app.route('/index', methods=['GET'])
+def index():
+    clients = redis_client.keys()
+    clients_data = []
+    for client in clients:
+        client_data = get_client_data(client.decode('utf-8'))
+        if client_data:
+            clients_data.append({
+                "client_id": client.decode('utf-8'),
+                "N": client_data["N"],
+                "t": client_data["t"],
+                "state": client_data["state"].name,
+                "commitment": client_data["commitment"],
+                "message": client_data.get("message", None),
+                "force_opened_message": client_data.get("force_opened_message", None)
+            })
+    elapsed_seconds = int(time.time() - auction_start_time)
+    return render_template('index.html', clients_data=clients_data, elapsed_seconds=elapsed_seconds, auction_duration=auction_duration), 200
 
 @app.route('/get/<client_id>', methods=['GET'])
 def get_client(client_id):

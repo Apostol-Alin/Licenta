@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Private Auctions</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href='https://fonts.googleapis.com/css?family=Orbitron' rel='stylesheet' type='text/css'>
+</head>
+<body onload="startCountdown({{ auction_duration - elapsed_seconds }})">
+  <script type='text/javascript' src={{ url_for('static', filename='main.js') }}></script>
+    <nav>
+        <div class="nav-elements">
+            <button>Home</button>
+        </div>
+    </nav>
+    <h1 class='main_title'>Secure Private Auctions Platform</h1>
+    <br>
+    <div class="auction-timer">
+      <h2>Auction countdown: <span id="countdown"></span></h2>
+    </div>
+    <div class="clients-container">
+      {% for data in clients_data %}
+        <div class="client">
+          <p><strong>Client ID:</strong> {{ data['client_id'] }}</p>
+          <p><strong>N:</strong> {{ data['N'] }}</p>
+          <p><strong>t:</strong> {{ data['t'] }}</p>
+          <p><strong>Auction State:</strong> {{ data['state'] }}</p>
+          {% if data['commitment'] %}
+            <p><strong>Commitment ciphertext:</strong> {{ data['commitment']['S'] }}</p>
+          {% else %}
+            <p><strong>No commitment sent yet.</strong></p>
+          {% endif %}
+          <p><strong>Message:</strong> {{ data['message'] }}</p>
+          <p><strong>Message obtained from force opening:</strong> {{ data['force_opened_message'] }}</p>
+        </div>
+      {% endfor %}
+    </div>
+    
+</body>
+</html>
