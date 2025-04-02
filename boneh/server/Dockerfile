@@ -12,5 +12,5 @@ COPY TC.py .
 COPY templates ./templates/
 COPY static ./static/
 COPY server.py .
-CMD ["gunicorn", "-b", "0.0.0.0:5000", "-w", "2", "--timeout", "300", "server:app"]
+CMD ["gunicorn", "-b", "0.0.0.0:5000", "-w", "4", "--timeout", "300", "server:app"]
 # CMD ["python3", "server.py"]

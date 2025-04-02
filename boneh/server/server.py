@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect
 from enum import Enum
 import time
 from TC import *
@@ -306,9 +306,9 @@ def force_open(client_id):
         verifier = client_data["verifier"]
         commitment = Commitment(client_data["commitment"]["g"], client_data["commitment"]["u"], client_data["commitment"]["S"])
         force_opened_message = verifier.force_open(commitment)
-        client_data["force_opened_message"] = force_opened_message
+        client_data["message"] = force_opened_message
         save_client_data(client_id, client_data)
-        return jsonify({"message": "Force open of the commitment started", "client_id": client_id}), 202
+        return redirect('/index'), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
@@ -330,11 +330,20 @@ def index():
                 "t": client_data["t"],
                 "state": client_data["state"].name,
                 "commitment": client_data["commitment"],
-                "message": client_data.get("message", None),
-                "force_opened_message": client_data.get("force_opened_message", None)
+                "message": client_data.get("message", None)
             })
     elapsed_seconds = int(time.time() - auction_start_time)
     return render_template('index.html', clients_data=clients_data, elapsed_seconds=elapsed_seconds, auction_duration=auction_duration), 200
+
+@app.route('/check-auction-over', methods=['GET'])
+def check_auction_over():
+    """
+    Check if the auction is over.
+    """
+    if time.time() - auction_start_time > auction_duration:
+        return jsonify({"message": "yes"}), 200
+    else:
+        return jsonify({"message": "no"}), 200
 
 @app.route('/get/<client_id>', methods=['GET'])
 def get_client(client_id):
@@ -349,8 +358,7 @@ def get_client(client_id):
         "W": client_data["W"],
         "pairs": client_data.get("pairs"),
         "Ys": client_data.get("Ys"),
-        "message": client_data.get("message", None),
-        "force_opened_message": client_data.get("force_opened_message", None)
+        "message": client_data.get("message", None)
     }
     return jsonify(new_data), 202
 

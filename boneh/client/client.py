@@ -123,32 +123,38 @@ def open(v: int):
     else:
         print(f"Failed to open commitment: {response.json()}")
 
+def check_auction_over():
+    response = requests.get(f"{SERVER_URL}/check-auction-over")
+    return response.json().get("message")
+
 if __name__ == "__main__":
-    lambda_ = 128
-    t = 27
-    client = Commiter(lambda_, t)
-    send_pp(client.N, client.t)
-    commitment = client.commit(message)
-    g, u, S = commitment.g, commitment.u, commitment.S
-    commitment_dict = {'g': g, 'u': u, 'S': S}
-    client.compute_W()
-    send_commitment(commitment_dict, client.W)
-    Cs = get_Cs()
-    client.compute_pairs()
-    send_pairs(client.pairs)
-    openings, g, h, N = get_Cs_openings()
-    pp = PedersenCommitmentPublicParams()
-    pp.g = g
-    pp.h = h
-    pp.N = N
     try:
+        lambda_ = 128
+        t = 27
+        client = Commiter(lambda_, t)
+        send_pp(client.N, client.t)
+        commitment = client.commit(message)
+        g, u, S = commitment.g, commitment.u, commitment.S
+        commitment_dict = {'g': g, 'u': u, 'S': S}
+        client.compute_W()
+        send_commitment(commitment_dict, client.W)
+        Cs = get_Cs()
+        client.compute_pairs()
+        send_pairs(client.pairs)
+        openings, g, h, N = get_Cs_openings()
+        pp = PedersenCommitmentPublicParams()
+        pp.g = g
+        pp.h = h
+        pp.N = N
         Cs = open_Cs(Cs, openings, pp)
         client.compute_Ys(Cs)
         send_Ys(client.Ys)
         a = pow(2, (2 ** t - len(message)), (client.p1 - 1) * (client.p2 - 1))
         v = pow(client.g, a, client.N)
-        # sleep(15)
-        open(v)
+        while check_auction_over() == "no": # only proceed to send opening if auction is over
+            sleep(5)
+        if CLIENT_ID == "client1": # make client1 the only one to open his timmed commitment
+            open(v)
     except Exception as e:
         quit_auction()
         print(e)
