@@ -18,6 +18,7 @@ app = Flask(__name__)
 
 auction_start_time = time.time()
 auction_duration = 30 # 30 seconds
+t = 26
 
 # client_data = {
 #     # "client_id": {
@@ -47,21 +48,24 @@ def get_client_data(client_id):
         return pickle.loads(data)
     return None
 
+@app.route('/get-time-parameter', methods=["GET"])
+def get_time_parameter():
+    return {"t": t}, 200
+
 @app.route('/send-public-parameters', methods=['POST'])
 def send_public_parameters():
     if time.time() - auction_start_time > auction_duration:
         return jsonify({"error": "Auction has ended"}), 400
     """
-    The client sends public parameters (N and t) to the server."""
+    The client sends public parameters (N) to the server."""
     try:
         req_json = request.get_json()
         client_id = req_json.get("client_id")
         N = int(req_json.get('N'))
-        t = int(req_json.get('t'))
         if not client_id:
             raise ValueError("Client ID must be provided.")
-        if not N or not t:
-            raise ValueError("Both N and t must be provided.")
+        if not N:
+            raise ValueError("N must be provided")
         client_data = {
             "N": N,
             "t": t,
@@ -289,7 +293,7 @@ def open():
         verifier = client_data["verifier"]
         commitment = Commitment(client_data["commitment"]["g"], client_data["commitment"]["u"], client_data["commitment"]["S"])
         message = verifier.open(commitment, v)
-        client_data["message"] = message
+        client_data["message"] = int(message, 2)
         save_client_data(client_id, client_data)
         return jsonify({"message": "Commitment opened to " + message, "client_id": client_id}), 200
     except Exception as e:
@@ -306,9 +310,9 @@ def force_open(client_id):
         verifier = client_data["verifier"]
         commitment = Commitment(client_data["commitment"]["g"], client_data["commitment"]["u"], client_data["commitment"]["S"])
         force_opened_message = verifier.force_open(commitment)
-        client_data["message"] = force_opened_message
+        client_data["message"] = int(force_opened_message, 2)
         save_client_data(client_id, client_data)
-        return redirect('/index'), 200
+        return redirect('/index'), 302
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
@@ -326,8 +330,6 @@ def index():
         if client_data:
             clients_data.append({
                 "client_id": client.decode('utf-8'),
-                "N": client_data["N"],
-                "t": client_data["t"],
                 "state": client_data["state"].name,
                 "commitment": client_data["commitment"],
                 "message": client_data.get("message", None)

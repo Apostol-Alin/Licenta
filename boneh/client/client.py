@@ -6,21 +6,13 @@ import ecdsa
 
 SERVER_URL = "http://server:5000"
 CLIENT_ID = os.getenv("CLIENT_ID", "default_client")
-message = os.getenv("MESSAGE", "0100111")
+message = os.getenv("MESSAGE", 500)
+message = bin(int(message))[2:]
 
-def send_data():
-    data = {
-        "client_id": CLIENT_ID,
-        "message": f"Hello from {CLIENT_ID}"
-    }
-    response = requests.post(SERVER_URL, json=data)
-    print(f"Client {CLIENT_ID} sent data: {response.json()}")
-
-def send_pp(N: int, t: int):
+def send_pp(N: int):
     data = {
         "client_id": CLIENT_ID,
         "N": N,
-        "t": t
     }
     response = requests.post(f"{SERVER_URL}/send-public-parameters", json=data)
     print(f"Client {CLIENT_ID} set public parameters, response: {response.json()}")
@@ -130,9 +122,9 @@ def check_auction_over():
 if __name__ == "__main__":
     try:
         lambda_ = 128
-        t = 27
+        t = int(requests.get(f"{SERVER_URL}/get-time-parameter").json().get("t"))
         client = Commiter(lambda_, t)
-        send_pp(client.N, client.t)
+        send_pp(client.N)
         commitment = client.commit(message)
         g, u, S = commitment.g, commitment.u, commitment.S
         commitment_dict = {'g': g, 'u': u, 'S': S}
