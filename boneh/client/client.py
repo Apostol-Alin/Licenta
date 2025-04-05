@@ -8,6 +8,7 @@ SERVER_URL = "http://server:5000"
 CLIENT_ID = os.getenv("CLIENT_ID", "default_client")
 message = os.getenv("MESSAGE", 500)
 message = bin(int(message))[2:]
+message = message.zfill(64)
 
 def send_pp(N: int):
     data = {
