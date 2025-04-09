@@ -4,17 +4,11 @@ from PedersenCommitmentScheme import *
 import random
 import time
 
-def generate_random_prime(lambda_: int) -> int:
-    p = sympy.randprime(2 ^ (lambda_ - 1), 2 ^ lambda_)
-    while p % 4 != 3:
-        p = sympy.randprime(2 ^ (lambda_ - 1), 2 ^ lambda_)
-    return p
-
 def generate_safe_prime(lambda_: int) -> int:
     print("Generating safe prime...")
     # We define a safe prime a prime number `q` for which (q - 1) // 2 is also prime
     q = sympy.randprime(2 ** lambda_, 2 ** (lambda_ + 1))
-    while not sympy.ntheory.isprime((q - 1) // 2):
+    while not q % 4 == 3:
         q = sympy.randprime(2 ** lambda_, 2 ** (lambda_ + 1))
     return q
 
@@ -25,19 +19,21 @@ class Commitment:
         self.S = S
 
 class Commiter:
-    def __init__(self, lambda_: int, t: int):
+    def __init__(self, lambda_: int, t: int, B: int = 128):
         self.p1 = generate_safe_prime(lambda_)
         self.p2 = generate_safe_prime(lambda_)
         self.t = t
         self.T = pow(2, t)
         self.N = self.p1 * self.p2
-        self.h = random.randint(2, (self.N - 1) // 2)
+        self.h = random.randint(2, self.N - 1)
+        self.B = B
         while self.h == self.p1 or self.h == self.p2:
-            self.h = random.randint(2, (self.N - 1) // 2)
-        # LAGRANGE THEOREM STATES THAT THE ORDER OF AN ELEMENT IN A FINITE GROUP DIVIDES THE ORDER OF THE GROUP
-        # So, g being an element of QRN, ord(g) divides ord(QRN); ord(g) divides fi(N) // 4
-        # That means we don't need to know the order of g as q, we will substitute q for fi(N) // 4
-        self.g = pow(self.h, 2, self.N)
+            self.h = random.randint(2, self.N - 1)
+        prime_less_than_B = [pow(x, self.N, self.N) for x in range(2, self.B) if sympy.ntheory.isprime(x)]
+        prod = 1
+        for x in prime_less_than_B:
+            prod *= x
+        self.g = pow(self.h, prod, self.N)
 
     def compute_u(self) -> int:
         a = pow(2, self.T, (self.p1 - 1) * (self.p2 - 1))
@@ -70,15 +66,12 @@ class Commiter:
         return Commitment(self.g, self.compute_u(), S)
     
     def compute_pairs(self):
-        # Pick t random values alpha_ from Zq where q is the order of g
-        # We don't know the order of g, but we know that it divides fi(N) // 4
-        # So we can pick random values from Zfi(N) // 4
         if len(self.W) != self.t + 1:
             raise ValueError(f"Expected W to have {self.t + 1} elements, but found {len(self.W)}")
         self.alphas = []
         self.pairs = []
         for i in range(self.t):
-            alpha = random.randint(1, (self.p1 - 1) * (self.p2 - 1) // 4)
+            alpha = random.randint(1, (self.p1 - 1) * (self.p2 - 1))
             self.alphas.append(alpha)
             z = pow(self.g, alpha, self.N)
             w = pow(self.W[i], alpha, self.N)
@@ -91,15 +84,16 @@ class Commiter:
         for i in range(self.t):
             alpha = self.alphas[i]
             a = pow(2, 2 ** i)
-            Y = ((Cs[i] * a) % ((self.p1 - 1) * (self.p2 - 1) // 4) + alpha) % ((self.p1 - 1) * (self.p2 - 1) // 4)
+            Y = ((Cs[i] * a) % ((self.p1 - 1) * (self.p2 - 1)) + alpha) % ((self.p1 - 1) * (self.p2 - 1))
             self.Ys.append(Y)
 
     
 class Verifier:
-    def __init__(self, N: int, t: int, R: int):
+    def __init__(self, N: int, t: int, R: int, B: int = 128):
         self.N = N
         self.t = t
         self.R = R
+        self.B = B
 
     def commit_to_cs(self):
         Cs = []
@@ -110,8 +104,13 @@ class Verifier:
             Cs.append((c, commitment, opening))
         self.Cs = Cs
 
-    def open(self, C: Commitment, v: int):
+    def open(self, C: Commitment, v_prime: int):
         l = len(C.S)
+        prime_less_than_B = [pow(x, self.N, self.N) for x in range(2, self.B) if sympy.ntheory.isprime(x)]
+        prod = 1
+        for x in prime_less_than_B:
+            prod *= x
+        v = pow(v_prime, prod, self.N)
         if pow(v, 2 ** l, self.N) != C.u:
             raise ValueError("Recieved v does not equal to expected value")
         msg = []
@@ -156,25 +155,18 @@ if __name__ == '__main__':
     subcontractor = Commiter(lambda_, t)
     commitment = subcontractor.commit(msg)
     a = pow(2, (2 ** t - len(msg)), (subcontractor.p1 - 1) * (subcontractor.p2 - 1))
-    v = pow(subcontractor.g, a, subcontractor.N)
+    v = pow(subcontractor.h, a, subcontractor.N)
     subcontractor.compute_W()
     orange = Verifier(subcontractor.N, t, 128)
-    orange.commit_to_cs()
-    subcontractor.compute_pairs()
-    subcontractor.compute_Ys([c for (c, _, _) in orange.Cs])
-    # for (c, comm_c, open_c) in orange.Cs:
-    #     print(f"{c} opens up: {pedersen_open(comm_c, c, open_c, orange.pp)}")
-    if orange.check_validity(subcontractor.W, subcontractor.pairs, subcontractor.Ys, subcontractor.g):
+    validity = 0
+    for _ in range(10):
+        orange.commit_to_cs()
+        subcontractor.compute_pairs()
+        subcontractor.compute_Ys([c for (c, _, _) in orange.Cs])
+        # for (c, comm_c, open_c) in orange.Cs:
+        #     print(f"{c} opens up: {pedersen_open(comm_c, c, open_c, orange.pp)}")
+        if orange.check_validity(subcontractor.W, subcontractor.pairs, subcontractor.Ys, subcontractor.g):
+            validity += 1
+    if validity == 10:
         print(orange.open(commitment, v))
         print(orange.force_open(commitment))
-
-    subcontractor2 = Commiter(lambda_, t)
-    commitment2 = subcontractor2.commit(msg)
-    a = pow(2, (2 ** t - len(msg)), (subcontractor2.p1 - 1) * (subcontractor2.p2 - 1))
-    v = pow(subcontractor2.g, a, subcontractor2.N)
-    subcontractor2.compute_W()
-    subcontractor2.compute_pairs()
-    subcontractor2.compute_Ys([c for (c, _, _) in orange.Cs])
-    if orange.check_validity(subcontractor2.W, subcontractor2.pairs, subcontractor2.Ys, subcontractor2.g):
-        print(orange.open(commitment2, v))
-        print(orange.force_open(commitment2))

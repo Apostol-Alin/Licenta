@@ -19,6 +19,8 @@ app = Flask(__name__)
 auction_start_time = time.time()
 auction_duration = 30 # 30 seconds
 t = 26
+B = 128
+R = 128
 
 # client_data = {
 #     # "client_id": {
@@ -52,6 +54,10 @@ def get_client_data(client_id):
 def get_time_parameter():
     return {"t": t}, 200
 
+@app.route('/get-B', methods=['GET'])
+def get_B():
+    return {"B": B}, 200
+
 @app.route('/send-public-parameters', methods=['POST'])
 def send_public_parameters():
     if time.time() - auction_start_time > auction_duration:
@@ -74,7 +80,7 @@ def send_public_parameters():
             "W": None,
             "pairs": None,
             "Ys": None,
-            "verifier": Verifier(N, t, 128) # make R=128 default value
+            "verifier": Verifier(N, t, R, B)
         }
         save_client_data(client_id, client_data)
         return jsonify({"message": "Public parameters received", "client_id": client_id}), 200

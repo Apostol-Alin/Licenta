@@ -124,13 +124,15 @@ if __name__ == "__main__":
     try:
         lambda_ = 128
         t = int(requests.get(f"{SERVER_URL}/get-time-parameter").json().get("t"))
-        client = Commiter(lambda_, t)
+        B = int(requests.get(f"{SERVER_URL}/get-B").json().get("B"))
+        client = Commiter(lambda_, t, B)
         send_pp(client.N)
         commitment = client.commit(message)
         g, u, S = commitment.g, commitment.u, commitment.S
         commitment_dict = {'g': g, 'u': u, 'S': S}
         client.compute_W()
         send_commitment(commitment_dict, client.W)
+
         Cs = get_Cs()
         client.compute_pairs()
         send_pairs(client.pairs)
@@ -143,7 +145,7 @@ if __name__ == "__main__":
         client.compute_Ys(Cs)
         send_Ys(client.Ys)
         a = pow(2, (2 ** t - len(message)), (client.p1 - 1) * (client.p2 - 1))
-        v = pow(client.g, a, client.N)
+        v = pow(client.h, a, client.N)
         while check_auction_over() == "no": # only proceed to send opening if auction is over
             sleep(5)
         if CLIENT_ID == "client1": # make client1 the only one to open his timmed commitment
