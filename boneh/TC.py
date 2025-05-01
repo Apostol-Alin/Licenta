@@ -155,7 +155,7 @@ if __name__ == '__main__':
     a = pow(2, (2 ** t - len(msg)), (subcontractor.p1 - 1) * (subcontractor.p2 - 1))
     v = pow(subcontractor.h, a, subcontractor.N)
     subcontractor.compute_W()
-    orange = Verifier(subcontractor.N, t, 128)
+    orange = Verifier(subcontractor.N, t, subcontractor.N)
     validity = 0
     for _ in range(10):
         orange.commit_to_cs()

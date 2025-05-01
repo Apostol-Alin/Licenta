@@ -80,7 +80,7 @@ def send_public_parameters():
             "W": None,
             "pairs": None,
             "Ys": None,
-            "verifier": Verifier(N, t, R, B)
+            "verifier": Verifier(N, t, N, B)
         }
         save_client_data(client_id, client_data)
         return jsonify({"message": "Public parameters received", "client_id": client_id}), 200
