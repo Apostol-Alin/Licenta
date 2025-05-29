@@ -4,7 +4,7 @@ from TC import *
 import os
 import ecdsa
 
-SERVER_URL = "http://server:5000"
+SERVER_URL = "https://server"
 CLIENT_ID = os.getenv("CLIENT_ID", "default_client")
 message = os.getenv("MESSAGE", 500)
 message = bin(int(message))[2:]
@@ -15,7 +15,7 @@ def send_pp(N: int):
         "client_id": CLIENT_ID,
         "N": N,
     }
-    response = requests.post(f"{SERVER_URL}/send-public-parameters", json=data)
+    response = requests.post(f"{SERVER_URL}/send-public-parameters", json=data, verify='certs/server.crt')
     print(f"Client {CLIENT_ID} set public parameters, response: {response.json()}")
 
 def send_commitment(commitment: dict, W: list[int]):
@@ -24,11 +24,11 @@ def send_commitment(commitment: dict, W: list[int]):
         "commitment": commitment,
         "W": W
     }
-    response = requests.post(f"{SERVER_URL}/send-commitment", json=data)
+    response = requests.post(f"{SERVER_URL}/send-commitment", json=data, verify='certs/server.crt')
     print(f"Client {CLIENT_ID} sent commitment, response: {response.json()}")
 
 def get_Cs():
-    response = requests.get(f"{SERVER_URL}/get-Cs/{CLIENT_ID}")
+    response = requests.get(f"{SERVER_URL}/get-Cs/{CLIENT_ID}", verify='certs/server.crt')
     if response.status_code == 200:
         Cs_affine_points = response.json().get("Cs")
         p=115792089237316195423570985008687907853269984665640564039457584007908834671663
@@ -49,7 +49,7 @@ def get_Cs():
         return None
     
 def get_Cs_openings():
-    response = requests.get(f"{SERVER_URL}/get-openings/{CLIENT_ID}")
+    response = requests.get(f"{SERVER_URL}/get-openings/{CLIENT_ID}", verify='certs/server.crt')
     if response.status_code == 200:
         openings = response.json().get("openings")
         g = response.json().get("g")
@@ -90,11 +90,11 @@ def send_pairs(pairs: list[tuple[int, int]]):
         "client_id": CLIENT_ID,
         "pairs": pairs
     }
-    response = requests.post(f"{SERVER_URL}/send-pairs", json=data)
+    response = requests.post(f"{SERVER_URL}/send-pairs", json=data, verify='certs/server.crt')
     print(f"Client {CLIENT_ID} sent pairs, response: {response.json()}")
 
 def quit_auction():
-    response = requests.delete(f"{SERVER_URL}/delete-client/{CLIENT_ID}")
+    response = requests.delete(f"{SERVER_URL}/delete-client/{CLIENT_ID}", verify='certs/server.crt')
     print(f"Client {CLIENT_ID} quit auction, response: {response.json()}")
 
 def send_Ys(Ys: list[tuple[int, int]]):
@@ -102,7 +102,7 @@ def send_Ys(Ys: list[tuple[int, int]]):
         "client_id": CLIENT_ID,
         "Ys": Ys
     }
-    response = requests.post(f"{SERVER_URL}/send-Ys", json=data)
+    response = requests.post(f"{SERVER_URL}/send-Ys", json=data, verify='certs/server.crt')
     print(f"Client {CLIENT_ID} sent Ys, response: {response.json()}")
 
 def open(v: int):
@@ -110,21 +110,21 @@ def open(v: int):
         "client_id": CLIENT_ID,
         "v": v
     }
-    response = requests.post(f"{SERVER_URL}/open", json=data)
+    response = requests.post(f"{SERVER_URL}/open", json=data, verify='certs/server.crt')
     if response.status_code == 200:
         print(f"Client {CLIENT_ID} opened commitment, response: {response.json()}")
     else:
         print(f"Failed to open commitment: {response.json()}")
 
 def check_auction_over():
-    response = requests.get(f"{SERVER_URL}/check-auction-over")
+    response = requests.get(f"{SERVER_URL}/check-auction-over", verify='certs/server.crt')
     return response.json().get("message")
 
 if __name__ == "__main__":
     try:
         lambda_ = 128
-        t = int(requests.get(f"{SERVER_URL}/get-time-parameter").json().get("t"))
-        B = int(requests.get(f"{SERVER_URL}/get-B").json().get("B"))
+        t = int(requests.get(f"{SERVER_URL}/get-time-parameter", verify='certs/server.crt').json().get("t"))
+        B = int(requests.get(f"{SERVER_URL}/get-B", verify='certs/server.crt').json().get("B"))
         client = Commiter(lambda_, t, B)
         send_pp(client.N)
         commitment = client.commit(message)

@@ -1,0 +1,34 @@
+---
+- name: Generare certifical selfsigned OpenSSL
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: "Generare cheia privata cu valori default (2048 biti, RSA)"
+      community.crypto.openssl_privatekey:
+        path: ./server/certs/server.key
+        size: "2048"
+    - name: "Generare CSR (Certificate Signing Request) cu SAN (Subject Alternative Names)"
+      community.crypto.openssl_csr:
+        path: ./server/certs/server.csr
+        privatekey_path: ./server/certs/server.key
+        country_name: RO
+        state_or_province_name: Bucuresti
+        locality_name: Bucuresti
+        organization_name: "Apostol"
+        organizational_unit_name: "Alin"
+        common_name: "localhost"
+        subject_alt_name:
+          - "DNS:localhost"
+          - "DNS:server"
+          - "DNS:almalinux.mshome.net"
+    - name: "Generare certificat selfsigned"
+      community.crypto.x509_certificate:
+        path: ./server/certs/server.crt
+        privatekey_path: ./server/certs/server.key
+        csr_path: ./server/certs/server.csr
+        provider: selfsigned
+    - name: "Copiere certificat in client"
+      copy:
+        src: ./server/certs/server.crt
+        dest: ./client/certs/server.crt
+ 

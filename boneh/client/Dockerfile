@@ -5,7 +5,5 @@ RUN dnf install -y python3 && \
     pip install requests && \
     pip install ecdsa && \
     pip install sympy
-COPY PedersenCommitmentScheme.py .
-COPY TC.py .
-COPY client.py .
+COPY . .
 CMD ["python3", "client.py"]
