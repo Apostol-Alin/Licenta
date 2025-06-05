@@ -148,7 +148,7 @@ if __name__ == "__main__":
         v = pow(client.h, a, client.N)
         while check_auction_over() == "no": # only proceed to send opening if auction is over
             sleep(5)
-        if CLIENT_ID == "client1": # make client1 the only one to open his timmed commitment
+        if CLIENT_ID != "client2": # make client2 refuse to open his timmed commitment
             open(v)
     except Exception as e:
         quit_auction()

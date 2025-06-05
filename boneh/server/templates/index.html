@@ -24,7 +24,7 @@
           <p><strong>Client ID:</strong> {{ data['client_id'] }}</p>
           <p><strong>Auction State:</strong> {{ data['state'] }}</p>
           {% if data['commitment'] %}
-            <p><strong>Commitment ciphertext:</strong> {{ data['commitment']['S'] }}</p>
+            <p><strong>Commitment ciphertext:</strong> <span class="ciphertext">{{ data['commitment']['S'] }}</span></p>
           {% else %}
             <p><strong>No commitment sent yet.</strong></p>
           {% endif %}
