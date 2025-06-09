@@ -29,6 +29,11 @@
             <p><strong>No commitment sent yet.</strong></p>
           {% endif %}
           <p><strong>Message:</strong> {{ data['message'] }}</p>
+          {% if data['force_opened'] %}
+            <p>Force Opened</p>
+          {% else %}
+            <p>Not Force Opened</p>
+          {% endif %}
           <a href="{{ url_for('force_open', client_id=data['client_id']) }}" class="force_open_button">Force Open</a>
         </div>
       {% endfor %}

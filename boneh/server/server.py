@@ -317,6 +317,7 @@ def force_open(client_id):
         commitment = Commitment(client_data["commitment"]["g"], client_data["commitment"]["u"], client_data["commitment"]["S"])
         force_opened_message = verifier.force_open(commitment)
         client_data["message"] = int(force_opened_message, 2)
+        client_data["force_opened"] = True
         save_client_data(client_id, client_data)
         return redirect('/index'), 302
     except Exception as e:
@@ -338,7 +339,8 @@ def index():
                 "client_id": client.decode('utf-8'),
                 "state": client_data["state"].name,
                 "commitment": client_data["commitment"],
-                "message": client_data.get("message", None)
+                "message": client_data.get("message", None),
+                "force_opened": client_data.get("force_opened", False)
             })
     elapsed_seconds = int(time.time() - auction_start_time)
     return render_template('index.html', clients_data=clients_data, elapsed_seconds=elapsed_seconds, auction_duration=auction_duration), 200
