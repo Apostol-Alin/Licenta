@@ -1,7 +1,7 @@
 import sympy
 import sympy.ntheory
 from PedersenCommitmentScheme import *
-import random
+import secrets
 import time
 
 def generate_safe_prime(lambda_: int) -> int:
@@ -23,10 +23,10 @@ class Commiter:
         self.t = t
         self.T = pow(2, t)
         self.N = self.p1 * self.p2
-        self.h = random.randint(2, self.N - 1)
+        self.h = secrets.randbelow(self.N - 1)
+        while self.h <= 1 or self.h == self.p1 or self.h == self.p2:
+            self.h = secrets.randbelow(self.N - 1)
         self.B = B
-        while self.h == self.p1 or self.h == self.p2:
-            self.h = random.randint(2, self.N - 1)
         prime_less_than_B = [pow(x, self.N, self.N) for x in range(2, self.B) if sympy.ntheory.isprime(x)]
         prod = 1
         for x in prime_less_than_B:
@@ -69,7 +69,9 @@ class Commiter:
         self.alphas = []
         self.pairs = []
         for i in range(self.t):
-            alpha = random.randint(1, (self.p1 - 1) * (self.p2 - 1))
+            alpha = secrets.randbelow((self.p1 - 1) * (self.p2 - 1))
+            while alpha <= 1:
+                alpha = secrets.randbelow((self.p1 - 1) * (self.p2 - 1))
             self.alphas.append(alpha)
             z = pow(self.g, alpha, self.N)
             w = pow(self.W[i], alpha, self.N)
@@ -97,7 +99,7 @@ class Verifier:
         Cs = []
         self.pp = PedersenCommitmentPublicParams()
         for i in range(0, self.t):
-            c = random.randint(0, self.R)
+            c = secrets.randbelow(self.R)
             commitment, opening = pedersen_commit(c, self.pp)
             Cs.append((c, commitment, opening))
         self.Cs = Cs
